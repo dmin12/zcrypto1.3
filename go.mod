@@ -1,4 +1,4 @@
-module github.com/zmap/zcrypto
+module github.com/dmin12/zcrypto1.3
 
 require (
 	github.com/mreiferson/go-httpclient v0.0.0-20201222173833-5e475fde3a4d
