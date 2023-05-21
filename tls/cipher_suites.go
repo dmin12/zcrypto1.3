@@ -217,6 +217,12 @@ var cipherSuites = []*cipherSuite{
 	{TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheECDSAKA, suiteECDHE | suiteECSign | suiteDefaultOff, cipherRC4, macSHA1, nil},
 }
 
+
+// Incidences of unsupported cipher-suites are annotated in-line with comments
+// The following guidelines should be noted:
+//   - DSS Suites: certificates are not supported (Certificate)
+//   - PSK Suites: Not supported/implemented (Symmetric Key)
+//   - Non-ephemeral, Anonymous DH: Not supported/implemented (Kex)
 var implementedCipherSuites = []*cipherSuite{
 	// Ciphersuite order is chosen so that ECDHE comes before plain RSA and
 	// AEADs are the top preference.

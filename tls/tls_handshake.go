@@ -72,6 +72,15 @@ type ServerHello struct {
 
 type SupportedVersionsExt struct {
 	SelectedVersion TLSVersion `json:"selected_version"`
+	CompressionMethod           uint8             `json:"compression_method"`
+	OcspStapling                bool              `json:"ocsp_stapling"`
+	TicketSupported             bool              `json:"ticket"`
+	SecureRenegotiation         bool              `json:"secure_renegotiation"`
+	HeartbeatSupported          bool              `json:"heartbeat"`
+	ExtendedRandom              []byte            `json:"extended_random,omitempty"`
+	ExtendedMasterSecret        bool              `json:"extended_master_secret"`
+	SignedCertificateTimestamps []ParsedAndRawSCT `json:"scts,omitempty"`
+	AlpnProtocol                string            `json:"alpn_protocol,omitempty"`
 }
 
 // SimpleCertificate holds a *x509.Certificate and a []byte for the certificate
@@ -371,6 +380,8 @@ func (m *serverHelloMsg) MakeLog() *ServerHello {
 			SelectedVersion: TLSVersion(m.supportedVersion),
 		}
 	}
+	sh.ExtendedMasterSecret = m.extendedMasterSecret
+	sh.AlpnProtocol = m.alpnProtocol
 	return sh
 }
 

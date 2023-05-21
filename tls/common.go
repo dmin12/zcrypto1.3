@@ -1023,6 +1023,15 @@ func (c *Config) Clone() *Config {
 		DontBufferHandshakes:          c.DontBufferHandshakes,
 		sessionTicketKeys:             c.sessionTicketKeys,
 		autoSessionTicketKeys:         c.autoSessionTicketKeys,
+		ClientFingerprintConfiguration: c.ClientFingerprintConfiguration,
+		// originalConfig is deliberately not duplicated.
+
+		// Not merged from upstream:
+		// GetCertificate: c.GetCertificate,
+		// DynamicRecordSizingDisabled: c.DynamicRecordSizingDisabled,
+		// VerifyPeerCertificate:    c.VerifyPeerCertificate,
+		// KeyLogWriter:             c.KeyLogWriter,
+		// Renegotiation:            c.Renegotiation,
 	}
 }
 
