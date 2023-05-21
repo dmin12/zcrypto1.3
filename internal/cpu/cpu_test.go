@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/zmap/zcrypto/internal/cpu"
-	"github.com/zmap/zcrypto/internal/testenv"
+	. "github.com/dmin12/zcrypto1.3/internal/cpu"
+	"github.com/dmin12/zcrypto1.3/internal/testenv"
 )
 
 func TestMinimalFeatures(t *testing.T) {

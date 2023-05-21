@@ -10,11 +10,11 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/zmap/zcrypto/ct"
-	"github.com/zmap/zcrypto/ct/client"
-	"github.com/zmap/zcrypto/ct/x509"
-	"github.com/zmap/zcrypto/encoding/asn1"
-	"github.com/zmap/zcrypto/x509/pkix"
+	"github.com/dmin12/zcrypto1.3/ct"
+	"github.com/dmin12/zcrypto1.3/ct/client"
+	"github.com/dmin12/zcrypto1.3/ct/x509"
+	"github.com/dmin12/zcrypto1.3/encoding/asn1"
+	"github.com/dmin12/zcrypto1.3/x509/pkix"
 )
 
 // ASN1Certificate holds the top-level asn1 fields in a certificate.

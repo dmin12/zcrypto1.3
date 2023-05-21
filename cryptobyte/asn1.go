@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/zmap/zcrypto/cryptobyte/asn1"
-	encoding_asn1 "github.com/zmap/zcrypto/encoding/asn1"
+	"github.com/dmin12/zcrypto1.3/cryptobyte/asn1"
+	encoding_asn1 "github.com/dmin12/zcrypto1.3/encoding/asn1"
 )
 
 // This file contains ASN.1-related methods for String and Builder.

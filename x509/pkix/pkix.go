@@ -12,7 +12,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/zmap/zcrypto/encoding/asn1"
+	"github.com/dmin12/zcrypto1.3/encoding/asn1"
 )
 
 // LegacyNameString allows to specify legacy ZCrypto behaviour

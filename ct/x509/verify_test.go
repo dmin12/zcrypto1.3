@@ -6,7 +6,7 @@ package x509
 
 import (
 	// START CT CHANGES
-	"github.com/zmap/zcrypto/ct/x509/pkix"
+	"github.com/dmin12/zcrypto1.3/ct/x509/pkix"
 	// END CT CHANGES
 	"encoding/pem"
 	"errors"

@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zmap/zcrypto/internal/testenv"
-	"github.com/zmap/zcrypto/x509"
+	"github.com/dmin12/zcrypto1.3/internal/testenv"
+	"github.com/dmin12/zcrypto1.3/x509"
 )
 
 var rsaCertPEM = `-----BEGIN CERTIFICATE-----

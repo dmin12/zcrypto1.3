@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zmap/zcrypto/encoding/asn1"
-	"github.com/zmap/zcrypto/x509"
-	"github.com/zmap/zcrypto/x509/pkix"
+	"github.com/dmin12/zcrypto1.3/encoding/asn1"
+	"github.com/dmin12/zcrypto1.3/x509"
+	"github.com/dmin12/zcrypto1.3/x509/pkix"
 )
 
 func TestOCSPDecode(t *testing.T) {

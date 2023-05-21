@@ -16,7 +16,7 @@ import (
 	"hash"
 	"io"
 
-	"github.com/zmap/zcrypto/x509"
+	"github.com/dmin12/zcrypto1.3/x509"
 )
 
 // verifyHandshakeSignature verifies a signature against pre-hashed

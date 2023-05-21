@@ -16,8 +16,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/zmap/zcrypto/x509"
-	"github.com/zmap/zcrypto/x509/pkix"
+	"github.com/dmin12/zcrypto1.3/x509"
+	"github.com/dmin12/zcrypto1.3/x509/pkix"
 )
 
 func main() {

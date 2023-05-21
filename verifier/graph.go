@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/zmap/zcertificate"
-	"github.com/zmap/zcrypto/x509"
+	"github.com/dmin12/zcrypto1.3/x509"
 )
 
 // subjectAndKeyFingerprint is a SHA256 fingerprint of (public key, subject).

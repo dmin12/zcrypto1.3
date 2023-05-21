@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/zmap/zcrypto/ct/x509"
+	"github.com/dmin12/zcrypto1.3/ct/x509"
 )
 
 const kMaxTimestamp = 253402300799

@@ -7,7 +7,7 @@ package x509_test
 import (
 	"encoding/pem"
 
-	"github.com/zmap/zcrypto/x509"
+	"github.com/dmin12/zcrypto1.3/x509"
 )
 
 func Example_x509_ParseCertificate() {

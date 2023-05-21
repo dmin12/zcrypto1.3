@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zmap/zcrypto/encoding/asn1"
+	"github.com/dmin12/zcrypto1.3/encoding/asn1"
 )
 
 type auxAttributeTypeAndValue struct {

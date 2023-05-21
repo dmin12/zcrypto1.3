@@ -14,7 +14,7 @@
 
 package verifier
 
-import "github.com/zmap/zcrypto/x509"
+import "github.com/dmin12/zcrypto1.3/x509"
 
 const maxIntermediateCount = 9
 

@@ -12,8 +12,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/zmap/zcrypto/tls"
-	"github.com/zmap/zcrypto/x509"
+	"github.com/dmin12/zcrypto1.3/tls"
+	"github.com/dmin12/zcrypto1.3/x509"
 )
 
 // zeroSource is an io.Reader that returns an unlimited number of zero bytes.

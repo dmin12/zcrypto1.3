@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zmap/zcrypto/x509"
+	"github.com/dmin12/zcrypto1.3/x509"
 )
 
 // A Conn represents a secured connection.

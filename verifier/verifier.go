@@ -19,11 +19,11 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/zmap/zcrypto/x509"
-	"github.com/zmap/zcrypto/x509/pkix"
-	"github.com/zmap/zcrypto/x509/revocation/crl"
-	"github.com/zmap/zcrypto/x509/revocation/google"
-	"github.com/zmap/zcrypto/x509/revocation/mozilla"
+	"github.com/dmin12/zcrypto1.3/x509"
+	"github.com/dmin12/zcrypto1.3/x509/pkix"
+	"github.com/dmin12/zcrypto1.3/x509/revocation/crl"
+	"github.com/dmin12/zcrypto1.3/x509/revocation/google"
+	"github.com/dmin12/zcrypto1.3/x509/revocation/mozilla"
 )
 
 // VerificationResult contains the result of a verification of a certificate
