@@ -12,9 +12,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/zmap/zcrypto/ct"
 	jsonKeys "github.com/zmap/zcrypto/json"
 	"github.com/zmap/zcrypto/x509"
-	"github.com/zmap/zcrypto/x509/ct"
 )
 
 var ErrUnimplementedCipher error = errors.New("unimplemented cipher suite")
@@ -22,13 +22,11 @@ var ErrNoMutualCipher error = errors.New("no mutual cipher suite")
 
 type TLSVersion uint16
 
-type CipherSuite uint16
-
 type ClientHello struct {
 	Version              TLSVersion          `json:"version"`
 	Random               []byte              `json:"random"`
 	SessionID            []byte              `json:"session_id,omitempty"`
-	CipherSuites         []CipherSuite       `json:"cipher_suites"`
+	CipherSuites         []CipherSuiteID     `json:"cipher_suites"`
 	CompressionMethods   []CompressionMethod `json:"compression_methods"`
 	OcspStapling         bool                `json:"ocsp_stapling"`
 	TicketSupported      bool                `json:"ticket"`
@@ -54,11 +52,26 @@ type ParsedAndRawSCT struct {
 }
 
 type ServerHello struct {
-	Version     TLSVersion  `json:"version"`
-	Random      []byte      `json:"random"`
-	SessionID   []byte      `json:"session_id"`
-	CipherSuite CipherSuite `json:"cipher_suite"`
+	Version     TLSVersion    `json:"version"`
+	Random      []byte        `json:"random"`
+	SessionID   []byte        `json:"session_id"`
+	CipherSuite CipherSuiteID `json:"cipher_suite"`
 	// TODO FIXME: Why is this a raw uint8, not a CompressionMethod?
+	CompressionMethod           uint8                 `json:"compression_method"`
+	OcspStapling                bool                  `json:"ocsp_stapling"`
+	TicketSupported             bool                  `json:"ticket"`
+	SecureRenegotiation         bool                  `json:"secure_renegotiation"`
+	HeartbeatSupported          bool                  `json:"heartbeat"`
+	ExtendedRandom              []byte                `json:"extended_random,omitempty"`
+	ExtendedMasterSecret        bool                  `json:"extended_master_secret"`
+	SignedCertificateTimestamps []ParsedAndRawSCT     `json:"scts,omitempty"`
+	AlpnProtocol                string                `json:"alpn_protocol,omitempty"`
+	SupportedVersions           *SupportedVersionsExt `json:"supported_versions,omitempty"`
+	ExtensionIdentifiers        []uint16              `json:"extension_identifiers,omitempty"`
+}
+
+type SupportedVersionsExt struct {
+	SelectedVersion TLSVersion `json:"selected_version"`
 	CompressionMethod           uint8             `json:"compression_method"`
 	OcspStapling                bool              `json:"ocsp_stapling"`
 	TicketSupported             bool              `json:"ticket"`
@@ -176,7 +189,7 @@ func (v *TLSVersion) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON implements the json.Marshler interface
-func (cs *CipherSuite) MarshalJSON() ([]byte, error) {
+func (cs *CipherSuiteID) MarshalJSON() ([]byte, error) {
 	buf := make([]byte, 2)
 	buf[0] = byte(*cs >> 8)
 	buf[1] = byte(*cs)
@@ -194,7 +207,7 @@ func (cs *CipherSuite) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface
-func (cs *CipherSuite) UnmarshalJSON(b []byte) error {
+func (cs *CipherSuiteID) UnmarshalJSON(b []byte) error {
 	aux := struct {
 		Hex   string `json:"hex"`
 		Name  string `json:"name"`
@@ -206,7 +219,7 @@ func (cs *CipherSuite) UnmarshalJSON(b []byte) error {
 	if expectedName := nameForSuite(aux.Value); expectedName != aux.Name {
 		return fmt.Errorf("mismatched cipher suite and name, suite: %d, name: %s, expected name: %s", aux.Value, aux.Name, expectedName)
 	}
-	*cs = CipherSuite(aux.Value)
+	*cs = CipherSuiteID(aux.Value)
 	return nil
 }
 
@@ -276,9 +289,9 @@ func (m *clientHelloMsg) MakeLog() *ClientHello {
 	ch.SessionID = make([]byte, len(m.sessionId))
 	copy(ch.SessionID, m.sessionId)
 
-	ch.CipherSuites = make([]CipherSuite, len(m.cipherSuites))
+	ch.CipherSuites = make([]CipherSuiteID, len(m.cipherSuites))
 	for i, aCipher := range m.cipherSuites {
-		ch.CipherSuites[i] = CipherSuite(aCipher)
+		ch.CipherSuites[i] = CipherSuiteID(aCipher)
 	}
 
 	ch.CompressionMethods = make([]CompressionMethod, len(m.compressionMethods))
@@ -288,13 +301,7 @@ func (m *clientHelloMsg) MakeLog() *ClientHello {
 
 	ch.OcspStapling = m.ocspStapling
 	ch.TicketSupported = m.ticketSupported
-	ch.SecureRenegotiation = m.secureRenegotiation
-	ch.HeartbeatSupported = m.heartbeatEnabled
-
-	if len(m.extendedRandom) > 0 {
-		ch.ExtendedRandom = make([]byte, len(m.extendedRandom))
-		copy(ch.ExtendedRandom, m.extendedRandom)
-	}
+	ch.SecureRenegotiation = m.secureRenegotiationSupported && len(m.secureRenegotiation) > 0
 
 	ch.NextProtoNeg = m.nextProtoNeg
 	ch.ServerName = m.serverName
@@ -315,12 +322,12 @@ func (m *clientHelloMsg) MakeLog() *ClientHello {
 		ch.SessionTicket.LifetimeHint = 0 // Clients don't send
 	}
 
-	ch.SignatureAndHashes = make([]SignatureAndHash, len(m.signatureAndHashes))
-	for i, aGroup := range m.signatureAndHashes {
-		ch.SignatureAndHashes[i] = SignatureAndHash(aGroup)
+	ch.SignatureAndHashes = []SignatureAndHash{}
+	for _, sigAndAlg := range m.supportedSignatureAlgorithms {
+		if sa, ok := signatureAlgorithms[SignatureScheme(sigAndAlg)]; ok {
+			ch.SignatureAndHashes = append(ch.SignatureAndHashes, SignatureAndHash(sa))
+		}
 	}
-
-	ch.SctEnabled = m.sctEnabled
 
 	ch.AlpnProtocols = make([]string, len(m.alpnProtocols))
 	copy(ch.AlpnProtocols, m.alpnProtocols)
@@ -331,6 +338,7 @@ func (m *clientHelloMsg) MakeLog() *ClientHello {
 		copy(tempBytes, extBytes)
 		ch.UnknownExtensions[i] = tempBytes
 	}
+
 	return ch
 }
 
@@ -341,16 +349,16 @@ func (m *serverHelloMsg) MakeLog() *ServerHello {
 	copy(sh.Random, m.random)
 	sh.SessionID = make([]byte, len(m.sessionId))
 	copy(sh.SessionID, m.sessionId)
-	sh.CipherSuite = CipherSuite(m.cipherSuite)
+	sh.CipherSuite = CipherSuiteID(m.cipherSuite)
 	sh.CompressionMethod = m.compressionMethod
 	sh.OcspStapling = m.ocspStapling
 	sh.TicketSupported = m.ticketSupported
-	sh.SecureRenegotiation = m.secureRenegotiation
-	sh.HeartbeatSupported = m.heartbeatEnabled
-	if len(m.extendedRandom) > 0 {
-		sh.ExtendedRandom = make([]byte, len(m.extendedRandom))
-		copy(sh.ExtendedRandom, m.extendedRandom)
+	sh.SecureRenegotiation = m.secureRenegotiationSupported && len(m.secureRenegotiation) > 0
+	extensionIdentifiers, success := m.extractExtensions()
+	if success {
+		sh.ExtensionIdentifiers = extensionIdentifiers
 	}
+
 	if len(m.scts) > 0 {
 		for _, rawSCT := range m.scts {
 			var out ParsedAndRawSCT
@@ -361,6 +369,15 @@ func (m *serverHelloMsg) MakeLog() *ServerHello {
 				out.Parsed = sct
 			}
 			sh.SignedCertificateTimestamps = append(sh.SignedCertificateTimestamps, out)
+		}
+	}
+	//sh.ExtendedMasterSecret = m.extendedMasterSecret
+	sh.AlpnProtocol = m.alpnProtocol
+
+	// TLS 1.3 SupportedVersions
+	if m.supportedVersion != 0 {
+		sh.SupportedVersions = &SupportedVersionsExt{
+			SelectedVersion: TLSVersion(m.supportedVersion),
 		}
 	}
 	sh.ExtendedMasterSecret = m.extendedMasterSecret
@@ -386,6 +403,24 @@ func (m *certificateMsg) MakeLog() *Certificates {
 	return sc
 }
 
+func (m *certificateMsgTLS13) MakeLog() *Certificates {
+	sc := new(Certificates)
+	if len(m.certificate.Certificate) >= 1 {
+		cert := m.certificate.Certificate[0]
+		sc.Certificate.Raw = make([]byte, len(cert))
+		copy(sc.Certificate.Raw, cert)
+	}
+	if len(m.certificate.Certificate) >= 2 {
+		chain := m.certificate.Certificate[1:]
+		sc.Chain = make([]SimpleCertificate, len(chain))
+		for idx, cert := range chain {
+			sc.Chain[idx].Raw = make([]byte, len(cert))
+			copy(sc.Chain[idx].Raw, cert)
+		}
+	}
+	return sc
+}
+
 // addParsed sets the parsed certificates and the validation. It assumes the
 // chain slice has already been allocated.
 func (c *Certificates) addParsed(certs []*x509.Certificate, validation *x509.Validation) {
@@ -401,10 +436,11 @@ func (c *Certificates) addParsed(certs []*x509.Certificate, validation *x509.Val
 	c.Validation = validation
 }
 
+// TODO: ZGrab2
 func (m *serverKeyExchangeMsg) MakeLog(ka keyAgreement) *ServerKeyExchange {
 	skx := new(ServerKeyExchange)
 	skx.Raw = make([]byte, len(m.key))
-	var auth keyAgreementAuthentication
+	//var auth keyAgreementAuthentication
 	var errAuth error
 	copy(skx.Raw, m.key)
 	skx.Digest = append(make([]byte, 0), m.digest...)
@@ -413,27 +449,31 @@ func (m *serverKeyExchangeMsg) MakeLog(ka keyAgreement) *ServerKeyExchange {
 	switch ka := ka.(type) {
 	case *rsaKeyAgreement:
 		skx.RSAParams = ka.RSAParams()
-		auth = ka.auth
+		//auth = ka.auth
 		errAuth = ka.verifyError
+
 	case *dheKeyAgreement:
 		skx.DHParams = ka.DHParams()
-		auth = ka.auth
+		//auth = ka.auth
 		errAuth = ka.verifyError
+
 	case *ecdheKeyAgreement:
 		skx.ECDHParams = ka.ECDHParams()
-		auth = ka.auth
+		//auth = ka.auth
 		errAuth = ka.verifyError
 	default:
 		break
 	}
 
-	// Write out signature
-	switch auth := auth.(type) {
-	case *signedKeyAgreement:
-		skx.Signature = auth.Signature()
-	default:
-		break
-	}
+	/*
+		// Write out signature
+		switch auth := auth.(type) {
+		case *signedKeyAgreement:
+			skx.Signature = auth.Signature()
+		default:
+			break
+		}
+	*/
 
 	// Write the signature validation error
 	if errAuth != nil {
@@ -468,10 +508,6 @@ func (m *clientHandshakeState) MakeLog() *KeyMaterial {
 	copy(keymat.MasterSecret.Value, m.masterSecret)
 
 	keymat.PreMasterSecret = new(PreMasterSecret)
-	keymat.PreMasterSecret.Length = len(m.preMasterSecret)
-	keymat.PreMasterSecret.Value = make([]byte, len(m.preMasterSecret))
-	copy(keymat.PreMasterSecret.Value, m.preMasterSecret)
-
 	return keymat
 }
 
@@ -484,10 +520,6 @@ func (m *serverHandshakeState) MakeLog() *KeyMaterial {
 	copy(keymat.MasterSecret.Value, m.masterSecret)
 
 	keymat.PreMasterSecret = new(PreMasterSecret)
-	keymat.PreMasterSecret.Length = len(m.preMasterSecret)
-	keymat.PreMasterSecret.Value = make([]byte, len(m.preMasterSecret))
-	copy(keymat.PreMasterSecret.Value, m.preMasterSecret)
-
 	return keymat
 }
 
@@ -502,9 +534,10 @@ func (m *clientKeyExchangeMsg) MakeLog(ka keyAgreement) *ClientKeyExchange {
 		ckx.RSAParams.Length = uint16(len(m.ciphertext) - 2) // First 2 bytes are length
 		ckx.RSAParams.EncryptedPMS = make([]byte, len(m.ciphertext)-2)
 		copy(ckx.RSAParams.EncryptedPMS, m.ciphertext[2:])
-		// Premaster-Secret is available in KeyMaterial record
-	case *dheKeyAgreement:
-		ckx.DHParams = ka.ClientDHParams()
+	// Premaster-Secret is available in KeyMaterial record
+	// TODO: ZGrab2
+	//case *dheKeyAgreement:
+	//	ckx.DHParams = ka.ClientDHParams()
 	case *ecdheKeyAgreement:
 		ckx.ECDHParams = ka.ClientECDHParams()
 	default:

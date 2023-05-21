@@ -88,9 +88,10 @@ func marshalPublicKey(pub interface{}) (publicKeyBytes []byte, publicKeyAlgorith
 		publicKeyAlgorithm.Parameters = asn1.NullRawValue
 	case *ecdsa.PublicKey:
 		publicKeyBytes = elliptic.Marshal(pub.Curve, pub.X, pub.Y)
-		oid, ok := oidFromNamedCurve(pub.Curve)
-		if !ok {
-			return nil, pkix.AlgorithmIdentifier{}, errors.New("x509: unsupported elliptic curve")
+		var oid asn1.ObjectIdentifier
+		oid, err = oidFromNamedCurve(pub.Curve)
+		if err != nil {
+			return nil, pkix.AlgorithmIdentifier{}, err
 		}
 		publicKeyAlgorithm.Algorithm = oidPublicKeyECDSA
 		var paramBytes []byte
@@ -507,9 +508,10 @@ func GetSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) SignatureAlgorithm
 //	id-ecPublicKey OBJECT IDENTIFIER ::= {
 //	      iso(1) member-body(2) us(840) ansi-X9-62(10045) keyType(2) 1 }
 var (
-	oidPublicKeyRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
-	oidPublicKeyDSA   = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
-	oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+	oidPublicKeyRSA     = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	oidPublicKeyDSA     = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
+	oidPublicKeyECDSA   = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+	oidPublicKeyEd25519 = oidSignatureEd25519
 )
 
 func getPublicKeyAlgorithmFromOID(oid asn1.ObjectIdentifier) PublicKeyAlgorithm {
@@ -559,33 +561,33 @@ var (
 	oidKeyEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
 )
 
-func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
+func namedCurveFromOID(oid asn1.ObjectIdentifier) (elliptic.Curve, error) {
 	switch {
 	case oid.Equal(oidNamedCurveP224):
-		return elliptic.P224()
+		return elliptic.P224(), nil
 	case oid.Equal(oidNamedCurveP256):
-		return elliptic.P256()
+		return elliptic.P256(), nil
 	case oid.Equal(oidNamedCurveP384):
-		return elliptic.P384()
+		return elliptic.P384(), nil
 	case oid.Equal(oidNamedCurveP521):
-		return elliptic.P521()
+		return elliptic.P521(), nil
 	}
-	return nil
+	return nil, ErrUnsupportedEllipticCurve
 }
 
-func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
+func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, error) {
 	switch curve {
 	case elliptic.P224():
-		return oidNamedCurveP224, true
+		return oidNamedCurveP224, nil
 	case elliptic.P256():
-		return oidNamedCurveP256, true
+		return oidNamedCurveP256, nil
 	case elliptic.P384():
-		return oidNamedCurveP384, true
+		return oidNamedCurveP384, nil
 	case elliptic.P521():
-		return oidNamedCurveP521, true
+		return oidNamedCurveP521, nil
 	}
 
-	return nil, false
+	return nil, ErrUnsupportedEllipticCurve
 }
 
 // KeyUsage represents the set of actions that are valid for a given key. It's
@@ -821,6 +823,8 @@ type Certificate struct {
 	ParsedExplicitTexts         [][]string
 	ParsedNoticeRefOrganization [][]string
 
+	UserNotices [][]UserNotice
+
 	// Name constraints
 	NameConstraintsCritical bool // if true then the name constraints are marked critical.
 	PermittedDNSNames       []GeneralSubtreeString
@@ -863,8 +867,9 @@ type Certificate struct {
 
 	IsPrecert bool
 
-	// Internal
-	validSignature bool
+	// ValidSignature is true if the certificate was signed by any roots or
+	// intermediates given in a call to (*Certificate).Verify().
+	ValidSignature bool
 
 	// CT
 	SignedCertificateTimestampList []*ct.SignedCertificateTimestamp
@@ -939,6 +944,10 @@ func (c *Certificate) GetParsedSubjectCommonName(invalidateCache bool) ParsedDom
 // ErrUnsupportedAlgorithm results from attempting to perform an operation that
 // involves algorithms that are not currently implemented.
 var ErrUnsupportedAlgorithm = errors.New("x509: cannot verify signature: algorithm unimplemented")
+
+// ErrUnsupportedEllipticCurve results from attempting to perform an operation that
+// involves elliptic curves that are not currently implemented.
+var ErrUnsupportedEllipticCurve = errors.New("x509: unsupported elliptic curve")
 
 // An InsecureAlgorithmError
 type InsecureAlgorithmError SignatureAlgorithm
@@ -1174,6 +1183,11 @@ type userNotice struct {
 	ExplicitText asn1.RawValue   `asn1:"optional"`
 }
 
+type UserNotice struct {
+	ExplicitText    *string
+	NoticeReference *NoticeReference
+}
+
 type noticeReference struct {
 	Organization  asn1.RawValue
 	NoticeNumbers []int
@@ -1360,9 +1374,9 @@ func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (interface{
 		if len(rest) != 0 {
 			return nil, errors.New("x509: trailing data after ECDSA parameters")
 		}
-		namedCurve := namedCurveFromOID(*namedCurveOID)
-		if namedCurve == nil {
-			return nil, errors.New("x509: unsupported elliptic curve")
+		namedCurve, err := namedCurveFromOID(*namedCurveOID)
+		if err != nil {
+			return nil, err
 		}
 		x, y := elliptic.Unmarshal(namedCurve, asn1Data)
 		if x == nil {
@@ -1942,6 +1956,7 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 				out.ParsedExplicitTexts = make([][]string, len(policies))
 				out.ParsedNoticeRefOrganization = make([][]string, len(policies))
 				out.CPSuri = make([][]string, len(policies))
+				out.UserNotices = make([][]UserNotice, len(policies))
 
 				for i, policy := range policies {
 					out.PolicyIdentifiers[i] = policy.Policy
@@ -1950,6 +1965,7 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 						out.QualifierId[i] = append(out.QualifierId[i], qualifier.PolicyQualifierId)
 						userNoticeOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 2, 2}
 						cpsURIOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 2, 1}
+
 						if qualifier.PolicyQualifierId.Equal(userNoticeOID) {
 							var un userNotice
 							_, err := asn1.Unmarshal(qualifier.Qualifier.FullBytes, &un)
@@ -1957,15 +1973,27 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 								return nil, err
 							}
 							if err == nil {
+								groupUserNotice := UserNotice{}
 								if len(un.ExplicitText.Bytes) != 0 {
 									out.ExplicitTexts[i] = append(out.ExplicitTexts[i], un.ExplicitText)
-									out.ParsedExplicitTexts[i] = append(out.ParsedExplicitTexts[i], string(un.ExplicitText.Bytes))
+									parsed := string(un.ExplicitText.Bytes)
+									out.ParsedExplicitTexts[i] = append(out.ParsedExplicitTexts[i], parsed)
+
+									groupUserNotice.ExplicitText = &parsed
 								}
+
 								if un.NoticeRef.Organization.Bytes != nil || un.NoticeRef.NoticeNumbers != nil {
 									out.NoticeRefOrgnization[i] = append(out.NoticeRefOrgnization[i], un.NoticeRef.Organization)
 									out.NoticeRefNumbers[i] = append(out.NoticeRefNumbers[i], un.NoticeRef.NoticeNumbers)
 									out.ParsedNoticeRefOrganization[i] = append(out.ParsedNoticeRefOrganization[i], string(un.NoticeRef.Organization.Bytes))
+
+									groupUserNotice.NoticeReference = &NoticeReference{
+										Organization:  string(un.NoticeRef.Organization.Bytes),
+										NoticeNumbers: un.NoticeRef.NoticeNumbers,
+									}
 								}
+
+								out.UserNotices[i] = append(out.UserNotices[i], groupUserNotice)
 							}
 						}
 						if qualifier.PolicyQualifierId.Equal(cpsURIOID) {
