@@ -380,8 +380,8 @@ func (m *serverHelloMsg) MakeLog() *ServerHello {
 			SelectedVersion: TLSVersion(m.supportedVersion),
 		}
 	}
-	sh.ExtendedMasterSecret = m.extendedMasterSecret
-	sh.AlpnProtocol = m.alpnProtocol
+	// sh.ExtendedMasterSecret = m.extendedMasterSecret
+	// sh.AlpnProtocol = m.alpnProtocol
 	return sh
 }
 

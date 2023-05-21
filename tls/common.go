@@ -1023,7 +1023,7 @@ func (c *Config) Clone() *Config {
 		DontBufferHandshakes:          c.DontBufferHandshakes,
 		sessionTicketKeys:             c.sessionTicketKeys,
 		autoSessionTicketKeys:         c.autoSessionTicketKeys,
-		ClientFingerprintConfiguration: c.ClientFingerprintConfiguration,
+		// ClientFingerprintConfiguration: c.ClientFingerprintConfiguration,
 		// originalConfig is deliberately not duplicated.
 
 		// Not merged from upstream:
